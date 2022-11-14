@@ -33,25 +33,25 @@ pub struct Nmodl {
     /// Suffix
     suffix: String,
     /// Declared (but undefined) variables
-    symbols: Set<String>,
+    pub (crate) symbols: Set<String>,
     /// Settable constants
-    constants: Map<String, Quantity>,
+    pub (crate) constants: Map<String, Quantity>,
     /// Settable parameters, with optional defaults
-    parameters: Map<String, Option<Quantity>>,
+    pub (crate) parameters: Map<String, Option<Quantity>>,
     /// State variables
-    state: Set<String>,
+    pub (crate) state: Set<String>,
     /// State initialisation
-    init: Map<String, Stmnt>,
+    pub (crate) init: Map<String, Stmnt>, /* this hints at a module reorg */
     /// State derivatives
-    deriv: Map<String, Stmnt>,
+    pub (crate) deriv: Map<String, Stmnt>,
     /// Output for BREAK block
     pub outputs: Map<String, Stmnt>,
     /// Variables
     pub variables: Map<String, Stmnt>,
     /// Ionic species
-    species: Vec<String>,
+    pub (crate) species: Vec<String>,
     /// Transition matrix
-    transitions: Vec<(String, String, String, String)>,
+    pub (crate) transitions: Vec<(String, String, String, String)>,
     /// Event processing
     events: Map<String, Stmnt>,
     /// Kinetic system transition rates
@@ -766,7 +766,7 @@ fn ion_species(coll: &Collapsed) -> Vec<String> {
 }
 
 /// Map variables to dependencies
-fn find_dependencies(variables: &Map<String, Stmnt>) -> Map<String, Set<String>> {
+pub fn find_dependencies(variables: &Map<String, Stmnt>) -> Map<String, Set<String>> {
     let mut deps = Map::new();
     let add_var = |e: &Expr, acc: &mut Set<String>| {
         if let Expr::Var(v) = e {
@@ -788,7 +788,7 @@ fn find_dependencies(variables: &Map<String, Stmnt>) -> Map<String, Set<String>>
 ///    b : only constants
 ///    a : b and constants
 ///    r : a and b
-fn sorted_dependencies_of(
+pub fn sorted_dependencies_of(
     start: &[String],
     deps: &Map<String, Set<String>>,
     known: &Set<String>,
@@ -872,6 +872,15 @@ pub fn to_nmodl(
     base: &str,
     known_ions: &[String],
 ) -> Result<String> {
+    Ok(mk_nmodl(to_nmodl_raw(instance, filter, base, known_ions)?)?)
+}
+
+pub fn to_nmodl_raw(
+    instance: &Instance,
+    filter: &str,
+    base: &str,
+    known_ions: &[String],
+) -> Result<Nmodl> {
     let ty: &str = instance.component_type.name.as_ref();
     match base {
         "baseSynapse" => {
@@ -898,7 +907,7 @@ pub fn to_nmodl(
                     return Err(nmodl_error("Gap Junction without defined current 'i'"));
                 }
                 n.kind = Kind::Junction;
-                mk_nmodl(n)
+                Ok(n)
             } else {
                 let filter = filter.to_string();
                 let instance = instance.clone();
@@ -911,7 +920,7 @@ pub fn to_nmodl(
                     return Err(nmodl_error("Synapse without defined current 'i'"));
                 }
                 n.kind = Kind::Point;
-                mk_nmodl(n)
+                Ok(n)
             }
         }
         "baseIonChannel" => {
@@ -949,7 +958,7 @@ pub fn to_nmodl(
                 n.variables.insert(ki, xi);
             }
             n.kind = Kind::Density;
-            mk_nmodl(n)
+            Ok(n)
         }
         "concentrationModel" => {
             let mut filter = filter.to_string();
@@ -1042,7 +1051,7 @@ pub fn to_nmodl(
             if n.state.remove(ec) {
                 n.state.insert(xo.clone());
             }
-            mk_nmodl(n)
+            Ok(n)
         }
         _ => Err(nmodl_error(format!(
             "Type {} deriving an expected base {}",
@@ -1123,6 +1132,9 @@ pub fn export(
                     &path
                 );
                 write(&path, to_nmodl(&instance, filter, ty, known_ions)?)?;
+                path.set_extension("bytecode");
+                eprintln!("{path:?}");
+                write(&path, crate::bytecode::mk_bytecode(to_nmodl_raw(&instance, filter, ty, known_ions)?)?)?;
             }
         }
         Ok(())

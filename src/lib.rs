@@ -5,6 +5,7 @@ pub use std::collections::BTreeSet as Set;
 
 pub mod acc;
 pub mod bundle;
+pub mod bytecode;
 pub mod error;
 pub mod expr;
 pub mod instance;

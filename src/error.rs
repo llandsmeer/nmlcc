@@ -16,6 +16,8 @@ pub enum Error {
     },
     #[error("NMODL exporter error: {}", .what)]
     Nmodl { what: String },
+    #[error("Bytecode exporter error: {}", .what)]
+    Bytecode { what: String },
     #[error("ACC exporter error: {}", .what)]
     Acc { what: String },
     #[error("Unit error: {}", .what)]
